@@ -19,6 +19,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -34,6 +36,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define USB_BUF_LEN 3
+#define SERVO_MIN_MS 480 // 5% duty
+#define SERVO_MAX_MS 960 // 10% duty
+#define ADC_MAX_COUNTS 1023
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,13 +50,17 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+extern SPI_HandleTypeDef hspi1;
 
+uint8_t usb_rx_buffer[USB_BUF_LEN];
+uint8_t usb_tx_buffer[USB_BUF_LEN];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+static uint16_t ADC_Read();
+static uint16_t map_adc_to_ms(uint16_t adc_val);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -64,6 +74,7 @@ void SystemClock_Config(void);
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -87,6 +98,8 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -95,6 +108,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	uint16_t adc_val = ADC_Read();
+	uint16_t pulse_ms = map_adc_to_ms(adc_val);
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulse_ms);
+	HAL_Delay(10);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -122,6 +140,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
   /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
@@ -143,7 +162,22 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+static uint16_t ADC_Read() {
+	  usb_tx_buffer[0] = 0x01;
+	  usb_tx_buffer[1] = 0x80 | (0 << 4);
+	  usb_tx_buffer[2] = 0x00;
 
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+	  HAL_SPI_TransmitReceive(&hspi1, usb_tx_buffer, usb_rx_buffer, 3, HAL_MAX_DELAY);
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+
+	  uint16_t result = ((usb_rx_buffer[1] & 0x03) << 8) | usb_rx_buffer[2];
+	  return result;
+}
+
+static uint16_t map_adc_to_ms(uint16_t adc_val) {
+	return SERVO_MIN_MS + (adc_val*(SERVO_MAX_MS - SERVO_MIN_MS)) / ADC_MAX_COUNTS;
+}
 /* USER CODE END 4 */
 
 /**
@@ -177,5 +211,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
