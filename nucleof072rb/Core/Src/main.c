@@ -38,8 +38,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define USB_BUF_LEN 3
-#define SERVO_MIN_MS 480 // 5% duty
-#define SERVO_MAX_MS 960 // 10% duty
+#define SERVO_MIN_MS 3200 // 5% duty
+#define SERVO_MAX_MS 6400 // 10% duty
 #define ADC_MAX_COUNTS 1023
 /* USER CODE END PD */
 
